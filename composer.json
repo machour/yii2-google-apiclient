@@ -7,13 +7,14 @@
         "yii2",
         "google"
     ],
+    "license": "MIT",
     "homepage": "https://github.com/machour/yii2-google-apiclient",
     "time": "2015-10-23",
     "authors": [
         {
             "name": "Mehdi Achour",
             "email": "machour@gmail.com",
-            "role": "Developer"
+            "role": "Creator"
         }
     ],
     "support": {

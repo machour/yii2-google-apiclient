@@ -2,9 +2,11 @@
 
 namespace machour\yii2\google\apiclient\commands;
 
+use Google_Auth_Exception;
 use Google_Client;
 use Yii;
 use yii\console\Controller;
+use yii\console\Exception;
 use yii\helpers\Json;
 
 /**
@@ -34,62 +36,76 @@ class GoogleController extends Controller
     /**
      * @var string
      */
-    public $clientSecretPath = 'gmail.json';
+    public $clientSecretPath = '@runtime/google-apiclient/secret.json';
 
+
+    /**
+     * Prints this help message
+     */
+    public function actionIndex()
+    {
+        $this->run('/help', ['google_apiclient']);
+    }
 
     /**
      * Configures a Google API
      *
-     * This command echoes what you have entered as the message.
-     * @param string $id The api identifier. Will be prompted for if not provided.
+     * @param string $clientSecretPath The client secret file path
+     * @param string $api The api identifier. Will be prompted for if not provided.
+     * @throws Exception
      */
-    public function actionConfigure($id = '')
+    public function actionConfigure($clientSecretPath, $api = '')
     {
 
-        if (!$id || !isset($this->apis[$id])) {
-            if ($id) {
-                $this->stderr("Error: Unknown API requested: $id, prompting for the correct one..\n");
+        $this->clientSecretPath = Yii::getAlias($clientSecretPath);
+        if (!file_exists($this->clientSecretPath)) {
+            throw new Exception("The client secret file \"{$this->clientSecretPath}\" does not exist!");
+        }
+
+        if (!$api || !isset($this->apis[$api])) {
+            if ($api) {
+                $this->stderr("Error: Unknown API requested: $api, prompting for the correct one..\n");
             }
             // prompt for the api to use
             $options = [];
             foreach ($this->apis as $id => $versions) {
-                foreach ($versions as $version => $api) {
-                    $options[$id] = $api->title;
+                foreach ($versions as $version => $_api) {
+                    $options[$id] = $_api->title;
                     break;
                 }
             }
-            $id = $this->select("Pick an API to connect to", $options);
+            $api = $this->select("\nPick an API to connect to", $options);
         }
 
         $version = false;
-        if (count($this->apis[$id]) > 1) {
-            if ($this->prompt("The $id API has several versions. Install preferred version?")) {
-                foreach ($this->apis[$id] as $api) {
-                    if ($api->preferred) {
-                        $version = $api->version;
+        if (count($this->apis[$api]) > 1) {
+            if ($this->prompt("\nThe $api API has several versions. Install preferred version?")) {
+                foreach ($this->apis[$api] as $_api) {
+                    if ($_api->preferred) {
+                        $version = $_api->version;
                     }
                 }
             } else {
                 $versions = [];
-                foreach ($this->apis[$id] as $version => $api) {
+                foreach ($this->apis[$api] as $version => $_api) {
                     $versions[$version] = $version;
                 }
-                $version = $this->select("Pick the desired version number", $versions);
+                $version = $this->select("\nPick the desired version number", $versions);
             }
         } else {
-            $version = array_keys($this->apis[$id])[0];
+            $version = array_keys($this->apis[$api])[0];
         }
 
         if ($version) {
             // Discover the API
-            $api = $this->apis[$id][$version];
+            $discovery = $this->apis[$api][$version];
 
-            $response = Json::decode(file_get_contents($api->discoveryRestUrl), false);
+            $response = Json::decode(file_get_contents($discovery->discoveryRestUrl), false);
 
             $scopes = [];
             // Prompt for scopes if any
             if (isset($response->auth->oauth2->scopes)) {
-                $this->stdout("Available scopes :\n");
+                $this->stdout("\nAvailable scopes :\n");
                 $availableScopes = [];
                 foreach ($response->auth->oauth2->scopes as $scope => $desc) {
                     $availableScopes[] = $scope;
@@ -113,14 +129,14 @@ class GoogleController extends Controller
                         }
                     }
 
-                    $done = true;
+                    if (!empty($scopes)) {
+                        $done = true;
+                    }
                 }
             }
 
-            $credentialsPath = $this->generateCredentialsFile($id, $scopes);
-            $this->stdout(sptrinf("Credentials saved to %s\n\n", $credentialsPath));
-
-
+            $credentialsPath = $this->generateCredentialsFile($api, $scopes);
+            $this->stdout(sprintf("Credentials saved to %s\n\n", $credentialsPath));
 
         } else {
             $this->stderr("Something went terribly wrong..\n");
@@ -132,13 +148,15 @@ class GoogleController extends Controller
      *
      * @param bool|false $showAllVersions Whether to show all versions of each API
      */
-    public function actionIndex($showAllVersions = false)
+    public function actionList($showAllVersions = false)
     {
         foreach ($this->apis as $id => $versions) {
             foreach ($versions as $version => $api) {
-                $this->stdout($api->title . "\n");
                 if (!$showAllVersions) {
+                    $this->stdout($api->name . ' - ' . $api->title . "\n");
                     break;
+                } else {
+                    $this->stdout($api->id . ' - ' . $api->title . "\n");
                 }
             }
         }
@@ -170,17 +188,17 @@ class GoogleController extends Controller
     }
 
     /**
-     * Returns an authorized API client.
-     *
-     * @
-     * @return Google_Client the authorized client object
+     * Generates the credential file, prompting the user for the verification code
+     * @param string $api The API name
+     * @param Array $scopes The desired scopes
+     * @return string
      */
     private function generateCredentialsFile($api, $scopes) {
 
         $credentialsPath = Yii::getAlias($this->configPath) . '/' . $api . '_' . $this->getUuid() . '.json';
 
         $client = new Google_Client();
-        $client->setAuthConfigFile(Yii::getAlias($this->configPath) . '/' . $this->clientSecretPath);
+        $client->setAuthConfigFile($this->clientSecretPath);
         $client->setAccessType('offline');
         $client->setScopes(implode(' ', $scopes));
 
@@ -188,15 +206,25 @@ class GoogleController extends Controller
         $authUrl = $client->createAuthUrl();
         $this->stdout(sprintf("Open the following link in your browser:\n  %s\n", $authUrl));
 
-        $authCode = $this->prompt("Enter the verification code: ");
+        $authenticated = false;
 
-        // Exchange authorization code for an access token.
-        $accessToken = $client->authenticate($authCode);
+        while (!$authenticated) {
+            $authCode = $this->prompt("Enter the verification code: ");
+
+            // Exchange authorization code for an access token.
+            try {
+                $accessToken = $client->authenticate($authCode);
+                $authenticated = true;
+            } catch (Google_Auth_Exception $e) {
+                $this->stderr($e->getMessage() . "\n");
+            }
+        }
 
         // Store the credentials to disk.
-        if(!file_exists(dirname($credentialsPath))) {
+        if (!is_dir(dirname($credentialsPath))) {
             mkdir(dirname($credentialsPath), 0700, true);
         }
+        /** @var string $accessToken */
         file_put_contents($credentialsPath, $accessToken);
 
         return $credentialsPath;
@@ -229,19 +257,5 @@ class GoogleController extends Controller
             // 48 bits for "node"
             mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
         );
-    }
-
-
-    /**
-     * Expands the home directory alias '~' to the full path.
-     * @param string $path the path to expand.
-     * @return string the expanded path.
-     */
-    private function expandHomeDirectory($path) {
-        $homeDirectory = getenv('HOME');
-        if (empty($homeDirectory)) {
-            $homeDirectory = getenv("HOMEDRIVE") . getenv("HOMEPATH");
-        }
-        return str_replace('~', realpath($homeDirectory), $path);
     }
 }
