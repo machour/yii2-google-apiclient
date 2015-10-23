@@ -28,8 +28,5 @@
         "psr-4": {
             "machour\\yii2\\google\\apiclient\\": ""
         }
-    },
-    "extra": {
-        "bootstrap": "machour\\yii2\\google\\apiclient\\Bootstrap"
     }
 }
