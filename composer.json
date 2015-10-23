@@ -30,6 +30,6 @@
         }
     },
     "extra": {
-        "bootstrap": "machour\\yii2\\google\\apiclient"
+        "bootstrap": "machour\\yii2\\google\\apiclient\\Bootstrap"
     }
 }
