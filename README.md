@@ -34,7 +34,7 @@ Configuration
 
 In order to use this extension, you will be needing a credentials file for your Google Application.
 
-You can optionally generate this file using the provided console utility:
+You can generate this file using the provided console utility:
 
 * Configure the module in `config/console.php`:
 ```php
@@ -89,6 +89,7 @@ $messages = $service->users_messages->listUsersMessages('me', [
     'labelIds' => 'INBOX',
 ]);
 $list = $messages->getMessages();
+
 
 if (count($list) == 0) {
     echo "You have no emails in your INBOX .. how did you achieve that ??";
