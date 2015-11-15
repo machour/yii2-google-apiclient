@@ -1,11 +1,9 @@
-# yii2-google-apiclient
+A Yii2 wrapper for the official Google API PHP Client.
 
-A Yii2 wrapper for the official Google API PHP Client, featuring:
+This extension features:
 
-* Console utility to generate your credentials files
-* A component that will take care of the oAuth phases
-
-This package will also install the [google/apiclient](http://github.com/google/apiclient) library.
+* A console utility to generate your credentials files
+* A component that will take care of the authentication, and give you access to the service
 
 Installation
 ------------
@@ -26,6 +24,7 @@ or add
 
 to the require section of your `composer.json` file.
 
+This package will also install the [google/apiclient](http://github.com/google/apiclient) library.
 
 Configuration
 -------------
@@ -110,3 +109,5 @@ if (count($list) == 0) {
 
 }
 ```
+
+This documentation is available [online](http://machour.idk.tn/yii/machour/yii2-google-apiclient)
