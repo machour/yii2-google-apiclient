@@ -3,7 +3,6 @@
 namespace machour\yii2\google\apiclient\components;
 
 use Google_Client;
-use Google_Service_Gmail;
 use Yii;
 use yii\base\Component;
 use yii\base\Exception;
