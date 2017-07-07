@@ -46,7 +46,7 @@ class GoogleApiClient extends Component
             $this->api = $ref->newInstanceWithoutConstructor();
         }
         if (!is_subclass_of($this->api, 'Google_Service')) {
-            throw new Exception("Not a Google_Service class: " . $class);
+            throw new Exception("Not a Google_Service class: " . $this->api);
         }
 
         $this->clientSecretPath = Yii::getAlias($this->clientSecretPath);
